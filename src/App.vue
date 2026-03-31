@@ -3,7 +3,7 @@
 <template>
   <div id="app">
     <header>
-      <h1>Mosaki_Ling的博客</h1>
+      <h1>Mosaki_Ling的巫师手札</h1>
       <nav>
         <router-link to="/">首页</router-link>
         <router-link to="/about">关于我</router-link>
