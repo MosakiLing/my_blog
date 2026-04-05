@@ -1,13 +1,68 @@
 <template>
   <div class="home">
     <h2>最新魔法研究与旅行见闻：</h2>
-    <!-- 情况1：正在加载 -->
+    
+    <!-- 按钮栏：切换撰写表单 -->
+    <div class="action-bar">
+      <button @click="showWriteForm = !showWriteForm" class="write-btn">
+        {{ showWriteForm ? '← 返回首页' : '📝 撰写文章' }}
+      </button>
+    </div>
+
+    <!-- 撰写文章表单 -->
+    <div v-if="showWriteForm" class="write-form">
+      <h3>撰写新文章</h3>
+      <input v-model="newPost.title" placeholder="文章标题" class="form-input" />
+      <input v-model="newPost.tags" placeholder="标签（用逗号分隔，如：Vue,前端）" class="form-input" />
+      <textarea v-model="newPost.content" placeholder="文章内容（支持 Markdown 语法）" class="form-textarea" rows="12"></textarea>
+      <div class="form-buttons">
+        <button @click="submitPost" class="submit-btn">📤 提交文章</button>
+        <button @click="showWriteForm = false" class="cancel-btn">取消</button>
+      </div>
+      <p class="hint">提示：提交后会自动保存到服务器，刷新首页即可看到新文章。</p>
+    </div>
+
+    <!-- 搜索框 -->
+    <div class="search-bar">
+      <input 
+        type="text" 
+        v-model="searchKeyword" 
+        placeholder="搜索文章标题或内容..."
+        class="search-input"
+      />
+      <button v-if="searchKeyword" @click="searchKeyword = ''" class="clear-btn">✕</button>
+    </div>
+
+    <!-- 标签栏 -->
+    <div class="tags-bar">
+      <button 
+        :class="['tag-btn', { active: currentTag === 'all' }]"
+        @click="currentTag = 'all'"
+      >
+        全部
+      </button>
+      <button 
+        v-for="tag in allTags" 
+        :key="tag"
+        :class="['tag-btn', { active: currentTag === tag }]"
+        @click="currentTag = tag"
+      >
+        {{ tag }}
+      </button>
+    </div>
+
+    <!-- 加载中 -->
     <div v-if="loading" class="loading">加载中...</div>
-    <!-- 情况2：加载完成，显示文章列表 -->
+
+    <!-- 文章列表 -->
     <div v-else class="article-list">
-      <!-- 循环显示每一篇文章 -->
-      <router-link v-for="article in articles" :key="article.id" class="article-item" :to="`/post/${article.id}`">
-        <div class="article-title">{{ article.title }}</div>
+      <router-link 
+        v-for="article in filteredArticles" 
+        :key="article.id" 
+        class="article-item" 
+        :to="`/post/${article.id}`"
+      >
+        <div class="article-title" v-html="highlightText(article.title, searchKeyword)"></div>
         <div class="article-meta">
           <span>{{ article.date }}</span>
           <span class="tags">
@@ -16,225 +71,443 @@
             </span>
           </span>
         </div>
-        <div class="article-excerpt">{{ article.excerpt }}</div>
+        <div class="article-excerpt" v-html="highlightText(article.excerpt, searchKeyword)"></div>
       </router-link>
+
+      <div v-if="filteredArticles.length === 0" class="no-articles">
+        <span v-if="searchKeyword">没有找到"{{ searchKeyword }}"</span>
+        <span v-else-if="currentTag !== 'all'">没有"{{ currentTag }}"标签的文章</span>
+        <span v-else>暂无文章</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 
-// 文章列表数据
-const articles = ref([])  // 文章列表
-const loading = ref(true) // 加载状态，初始为 true（显示"加载中"）
+// ===== 数据 =====
+const articles = ref([])
+const loading = ref(true)
+const currentTag = ref('all')
+const searchKeyword = ref('')
+const showWriteForm = ref(false)  // 是否显示撰写表单
+const newPost = ref({
+  title: '',
+  tags: '',
+  content: ''
+})
 
-// 解析文章头部信息 frontmatter
-const parseFrontmatter = (markdown) => {
-  // 用正则找到 --- 和 --- 之间的内容
-  // 返回 { data: { title, date, tags }, content: 正文 }
-  const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/
-  const match = markdown.match(frontmatterRegex)
+// ===== 计算属性 =====
+// 所有标签
+const allTags = computed(() => {
+  const tags = new Set()
+  articles.value.forEach(article => {
+    article.tags.forEach(tag => tags.add(tag))
+  })
+  return Array.from(tags).sort()
+})
+
+// 筛选后的文章（标签 + 搜索同时生效）
+const filteredArticles = computed(() => {
+  let result = articles.value
   
-  if (!match) {
-    return {
-      data: { title: '无标题', date: '', tags: [] },
-      content: markdown
-    }
+  // 标签筛选
+  if (currentTag.value !== 'all') {
+    result = result.filter(a => a.tags.includes(currentTag.value))
   }
-
-  const frontmatterStr = match[1]
-  const content = match[2]
-  const data = {}
-  const lines = frontmatterStr.split('\n')
   
-  for (const line of lines) {
-    const colonIndex = line.indexOf(':')
-    if (colonIndex > 0) {
-      const key = line.slice(0, colonIndex).trim()
-      let value = line.slice(colonIndex + 1).trim()
-      
+  // 搜索筛选
+  if (searchKeyword.value.trim()) {
+    const kw = searchKeyword.value.trim().toLowerCase()
+    result = result.filter(a => 
+      a.title.toLowerCase().includes(kw) || 
+      a.fullContent.toLowerCase().includes(kw)
+    )
+  }
+  
+  return result
+})
+
+// ===== 辅助函数 =====
+// 高亮关键字
+const highlightText = (text, keyword) => {
+  if (!keyword || !text) return text
+  const kw = keyword.toLowerCase()
+  const lowerText = text.toLowerCase()
+  const index = lowerText.indexOf(kw)
+  if (index === -1) return text
+  return text.slice(0, index) + 
+         `<mark class="highlight">${text.slice(index, index + keyword.length)}</mark>` + 
+         text.slice(index + keyword.length)
+}
+
+// 解析 markdown 头部
+const parseFrontmatter = (markdown) => {
+  const match = markdown.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/)
+  if (!match) {
+    return { data: { title: '无标题', date: '', tags: [] }, content: markdown }
+  }
+  
+  const data = {}
+  match[1].split('\n').forEach(line => {
+    const idx = line.indexOf(':')
+    if (idx > 0) {
+      const key = line.slice(0, idx).trim()
+      let val = line.slice(idx + 1).trim()
       if (key === 'tags') {
-        value = value.replace(/[\[\]]/g, '')
-        data.tags = value.split(',').map(tag => tag.trim())
+        data.tags = val.replace(/[\[\]]/g, '').split(',').map(t => t.trim())
       } else {
-        data[key] = value
+        data[key] = val
       }
     }
-  }
+  })
   if (!data.tags) data.tags = []
-  return { data, content }
+  return { data, content: match[2] }
 }
 
-// 生成摘要（取正文前100个字符，去掉Markdown标记）
-const generateExcerpt = (content, maxLength = 100) => {
-  // 移除 Markdown 标题标记
-  let text = content.replace(/^#+\s+/gm, '')
-  // 移除图片标记
-  text = text.replace(/!\[.*?\]\(.*?\)/g, '')
-  // 移除链接标记，保留文字
-  text = text.replace(/\[(.*?)\]\(.*?\)/g, '$1')
-  // 移除代码块
-  text = text.replace(/```[\s\S]*?```/g, '')
-  // 移除行内代码
-  text = text.replace(/`(.*?)`/g, '$1')
-  // 移除加粗、斜体标记
-  text = text.replace(/(\*\*|__)(.*?)\1/g, '$2')
-  text = text.replace(/(\*|_)(.*?)\1/g, '$2')
-  
-  // 取前 maxLength 个字符
-  if (text.length > maxLength) {
-    return text.slice(0, maxLength) + '...'
+// 提取纯文本
+const getPlainText = (content, maxLen = 5000) => {
+  let text = content
+    .replace(/^#+\s+/gm, '')
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`(.*?)`/g, '$1')
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    .replace(/\n/g, ' ')
+  return text.length > maxLen ? text.slice(0, maxLen) : text
+}
+
+// 提交文章到后端
+const submitPost = async () => {
+  if (!newPost.value.title.trim()) {
+    alert('请填写文章标题')
+    return
   }
-  return text
+  if (!newPost.value.content.trim()) {
+    alert('请填写文章内容')
+    return
+  }
+
+  try {
+    const response = await fetch('http://localhost:3000/api/save-post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: newPost.value.title,
+        tags: newPost.value.tags,
+        content: newPost.value.content
+      })
+    })
+    const data = await response.json()
+    if (data.success) {
+      alert('文章已保存！刷新页面即可看到新文章。')
+      // 重置表单并刷新文章列表
+      newPost.value = { title: '', tags: '', content: '' }
+      showWriteForm.value = false
+      // 重新加载文章
+      await fetchArticles()
+    } else {
+      alert('保存失败：' + data.error)
+    }
+  } catch (err) {
+    console.error(err)
+    alert('请求后端失败，请确保后端服务已启动（npm run server）')
+  }
 }
 
-// 获取所有文章
+// ===== 加载文章 =====
 const fetchArticles = async () => {
   loading.value = true
   try {
-    // 第一步：获取文章列表（从 posts.json 读取）
-    const listResponse = await fetch('/posts.json')
-    if (!listResponse.ok) {
-      console.error('无法加载 posts.json，请确保文件存在')
-      articles.value = []
-      loading.value = false
-      return
-    }
+    const res = await fetch('/posts.json')
+    if (!res.ok) throw new Error('加载失败')
     
-    const fileNames = await listResponse.json()
+    const fileNames = await res.json()
+    const list = []
     
-    if (!Array.isArray(fileNames) || fileNames.length === 0) {
-      console.warn('posts.json 为空或格式错误')
-      articles.value = []
-      loading.value = false
-      return
-    }
-    console.log(`找到 ${fileNames.length} 篇文章:`, fileNames)
-
-    // 第二步：循环读取每个 .md 文件
-    const articlesData = []
-    for (const fileName of fileNames) {
+    for (const name of fileNames) {
       try {
-        const response = await fetch(`/posts/${fileName}.md`)
-        if (!response.ok) {
-          console.warn(`文章 ${fileName}.md 不存在，跳过`)
-          continue
-        }
-        const text = await response.text()  // 拿到整个 .md 文件内容
-
-        // 解析头部，拿到标题、日期、标签
+        const mdRes = await fetch(`/posts/${name}.md`)
+        if (!mdRes.ok) continue
+        
+        const text = await mdRes.text()
         const { data, content } = parseFrontmatter(text)
+        const plain = getPlainText(content)
         
-        // 生成摘要
-        const excerpt = generateExcerpt(content)
-        
-        // 存储文章数据
-        articlesData.push({
-          id: fileName,
+        list.push({
+          id: name,
           title: data.title || '无标题',
           date: data.date || '',
           tags: data.tags || [],
-          excerpt: excerpt
+          excerpt: plain.slice(0, 100) + (plain.length > 100 ? '...' : ''),
+          fullContent: plain
         })
       } catch (err) {
-        console.error(`加载文章 ${fileName} 失败:`, err)
+        console.error(`加载 ${name} 失败：` + err)
       }
     }
     
-    // 第三步：按日期排序（最新的在前面）
-    articlesData.sort((a, b) => {
-      if (!a.date) return 1
-      if (!b.date) return -1
-      return new Date(b.date) - new Date(a.date)
-    })
-    
-    // 第四步：把数据放到 articles 里，页面会自动更新
-    articles.value = articlesData
-    
-    if (articlesData.length === 0) {
-      console.warn('没有找到任何文章，请在 public/posts 目录下添加 .md 文件')
-    }
-  } catch (error) {
-    console.error('加载文章列表失败:', error)
+    list.sort((a, b) => new Date(b.date) - new Date(a.date))
+    articles.value = list
+  } catch (err) {
+    console.error(err)
   } finally {
-    loading.value = false // 加载结束
+    loading.value = false
   }
 }
 
-// 页面加载时获取文章
-onMounted(() => {
-  fetchArticles()
-})
+onMounted(fetchArticles)
 </script>
 
 <style scoped>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 /* 页面标题 */
 .home h2 {
   margin-bottom: 1.5rem;
   color: #2c3e50;
 }
-/* 加载中文字 */
+
+/* 搜索栏 */
+.search-bar {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background-color: #f8f9fa;
+  transition: all 0.3s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #42b983;
+  background-color: white;
+  box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.1);
+}
+
+.clear-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #999;
+  padding: 4px 8px;
+  border-radius: 20px;
+}
+
+.clear-btn:hover {
+  color: #666;
+  background-color: #f0f0f0;
+}
+
+/* 标签栏 */
+.tags-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.tag-btn {
+  background: #f0f0f0;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: #666;
+}
+
+.tag-btn:hover {
+  background: #e0e0e0;
+  transform: translateY(-2px);
+}
+
+.tag-btn.active {
+  background: #2c3e50;
+  color: white;
+}
+
+/* 加载中 */
 .loading {
   text-align: center;
   padding: 2rem;
   color: #666;
 }
-/* 文章列表容器（垂直排列，间距24px） */
+
+/* 文章列表 */
 .article-list {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
-/* 单个卡片（白色背景、圆角、阴影、内边距） */
+
 .article-item {
   background: white;
   border-radius: 8px;
   padding: 1.5rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  transition: box-shadow 0.3s;  /* 阴影变化动画 */
-  text-decoration: none;  /* 去掉下划线 */
+  transition: box-shadow 0.3s;
+  text-decoration: none;
   display: block;
-  color: inherit;  /* 文字颜色继承，不变成蓝色 */
+  color: inherit;
 }
-/* 鼠标悬停时，阴影变大 */
+
 .article-item:hover {
   box-shadow: 0 6px 16px rgba(0,0,0,0.15);
 }
-/* 文章标题 */
+
 .article-title {
   font-size: 1.25rem;
   font-weight: bold;
   color: #2c3e50;
-  margin-bottom: 0.5rem;  /* 下边距，和日期分开 */
+  margin-bottom: 0.5rem;
 }
-/* 鼠标悬停时，标题颜色变蓝 */
-.article-item:hover .article-title{
+
+.article-item:hover .article-title {
   color: #42b983;
 }
-/* 文章日期、标签 */
+
 .article-meta {
   display: flex;
   gap: 1rem;
   margin: 0.5rem 0;
   font-size: 0.875rem;
   color: #666;
+  flex-wrap: wrap;
 }
-/* 文章标签 */
+
 .tags {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
+
 .tag {
   background: #f0f0f0;
   padding: 0.125rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
 }
-/* 文章摘要 */
+
 .article-excerpt {
   color: #666;
   line-height: 1.5;
   margin-top: 0.5rem;
+}
+
+/* 高亮 */
+.highlight {
+  background-color: #ffeb3b;
+  color: #333;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* 空状态 */
+.no-articles {
+  text-align: center;
+  padding: 3rem;
+  color: #999;
+  background: white;
+  border-radius: 8px;
+}
+
+/* 按钮栏 */
+.action-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+.write-btn {
+  background: #42b983;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.write-btn:hover {
+  background: #359268;
+}
+
+/* 撰写表单 */
+.write-form {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.write-form h3 {
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #42b983;
+}
+.form-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.submit-btn {
+  background: #42b983;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.cancel-btn {
+  background: #ccc;
+  color: #333;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.hint {
+  color: #999;
+  font-size: 12px;
+  margin-top: 0.5rem;
+}
+
+.search-bar,
+.tags-bar,
+.article-list {
+  max-width: 700px;
 }
 </style>
