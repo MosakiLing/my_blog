@@ -1,15 +1,35 @@
 <template>
   <div class="post" v-if="article">
-    <h1>{{ article.title }}</h1>
-    <div class="post-meta">
-      <span>{{ article.date }}</span>
-      <div class="tags">
-        <span v-for="tag in article.tags" :key="tag" class="tag">
-          {{ tag }}
-        </span>
+    <!-- 操作按钮栏 -->
+    <div class="post-actions">
+      <button @click="toggleEditMode" class="edit-btn">✏️ 编辑</button>
+      <button @click="confirmDelete" class="delete-btn">🗑️ 删除</button>
+    </div>
+
+    <!-- 编辑模式 -->
+    <div v-if="isEditing" class="edit-form">
+      <input v-model="editForm.title" placeholder="标题" class="form-input" />
+      <input v-model="editForm.tags" placeholder="标签（逗号分隔）" class="form-input" />
+      <textarea v-model="editForm.content" placeholder="内容（Markdown）" rows="12" class="form-textarea"></textarea>
+      <div class="form-buttons">
+        <button @click="submitEdit" class="save-btn">💾 保存修改</button>
+        <button @click="cancelEdit" class="cancel-btn">取消</button>
       </div>
     </div>
-    <div class="post-content" v-html="article.content"></div>
+
+    <!-- 正常显示模式 -->
+    <div v-else>
+      <h1>{{ article.title }}</h1>
+      <div class="post-meta">
+        <span>{{ article.date }}</span>
+        <div class="tags">
+          <span v-for="tag in article.tags" :key="tag" class="tag">
+            {{ tag }}
+          </span>
+        </div>
+      </div>
+      <div class="post-content" v-html="article.content"></div>
+    </div>
   </div>
   <div v-else-if="loading" class="loading">
     <p>加载中...</p>
@@ -21,18 +41,113 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
+import { parseFrontmatter } from '@/utils/markdown'
 
 const route = useRoute()
+const router = useRouter()
 const article = ref(null)
 const loading = ref(true)
+
+// 编辑相关
+const isEditing = ref(false)
+const editForm = ref({
+  title: '',
+  tags: '',
+  content: ''
+})
+
+// 填充编辑表单
+const fillEditForm = () => {
+  editForm.value = {
+    title: article.value.title,
+    tags: article.value.tags.join(', '),
+    content: article.value.rawContent
+  }
+}
+
+// 切换编辑模式
+const toggleEditMode = () => {
+  if (!isEditing.value) {
+    fillEditForm()
+  }
+  isEditing.value = !isEditing.value
+}
+
+// 取消编辑
+const cancelEdit = () => {
+  isEditing.value = false
+}
+
+// 提交编辑
+const submitEdit = async () => {
+  if (!editForm.value.title.trim() || !editForm.value.content.trim()) {
+    alert('标题和内容不能为空')
+    return
+  }
+
+  try {
+    const response = await fetch(`http://localhost:3000/api/update-post/${route.params.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: editForm.value.title,
+        tags: editForm.value.tags,
+        content: editForm.value.content
+      })
+    })
+    const data = await response.json()
+    if (data.success) {
+      alert('文章已更新')
+      // 如果文件名变了，跳转到新 URL
+      if (data.new_filename && data.new_filename !== route.params.id) {
+        router.push(`/post/${data.new_filename}`)
+      } else {
+        // 重新加载当前文章
+        await loadArticle()
+      }
+      isEditing.value = false
+    } else {
+      alert('更新失败：' + data.error)
+    }
+  } catch (err) {
+    console.error(err)
+    alert('请求后端失败')
+  }
+}
+
+// 确认删除
+const confirmDelete = () => {
+  if (confirm('确定要删除这篇文章吗？此操作不可恢复。')) {
+    deleteArticle()
+  }
+}
+
+const deleteArticle = async () => {
+  try {
+    const response = await fetch(`http://localhost:3000/api/delete-post/${route.params.id}`, {
+      method: 'DELETE'
+    })
+    const data = await response.json()
+    if (data.success) {
+      alert('文章已删除')
+      router.push('/')  // 跳转回首页
+    } else {
+      alert('删除失败：' + data.error)
+    }
+  } catch (err) {
+    console.error(err)
+    alert('请求后端失败')
+  }
+}
 
 // 配置 markdown-it
 const md = new MarkdownIt({
   html: true,
+  breaks: true,
   highlight: function (str, lang) {
     if (lang && hljs.getLanguage(lang)) {
       try {
@@ -44,50 +159,6 @@ const md = new MarkdownIt({
     return ''
   }
 })
-
-// 手动解析 frontmatter（替代 gray-matter）
-const parseFrontmatter = (markdown) => {
-  // 匹配 --- 开头和结尾的 YAML 格式
-  const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/
-  const match = markdown.match(frontmatterRegex)
-  
-  if (!match) {
-    // 没有 frontmatter，返回默认值
-    return {
-      data: { title: '无标题', date: '', tags: [] },
-      content: markdown
-    }
-  }
-  
-  const frontmatterStr = match[1]
-  const content = match[2]
-  
-  // 手动解析 YAML 格式的 frontmatter
-  const data = {}
-  const lines = frontmatterStr.split('\n')
-  for (const line of lines) {
-    const colonIndex = line.indexOf(':')
-    if (colonIndex > 0) {
-      const key = line.slice(0, colonIndex).trim()
-      let value = line.slice(colonIndex + 1).trim()
-      
-      // 处理 tags（格式: tags: Vue, 前端, 入门 或 tags: [Vue, 前端]）
-      if (key === 'tags') {
-        // 去掉方括号
-        value = value.replace(/[\[\]]/g, '')
-        // 按逗号分割，并去除空格
-        data.tags = value.split(',').map(tag => tag.trim())
-      } else {
-        data[key] = value
-      }
-    }
-  }
-  
-  // 确保 tags 总是数组
-  if (!data.tags) data.tags = []
-  
-  return { data, content }
-}
 
 // 加载文章内容
 const loadArticle = async () => {
@@ -114,7 +185,8 @@ const loadArticle = async () => {
       title: data.title || '无标题',
       date: data.date || '',
       tags: data.tags || [],
-      content: htmlContent
+      content: htmlContent,
+      rawContent: content  // 保存原始 Markdown
     }
     
     console.log('文章加载成功:', article.value.title)
@@ -214,5 +286,101 @@ onMounted(() => {
 
 .error {
   color: #e74c3c;
+}
+
+.post-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.edit-btn, .delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+}
+.edit-btn {
+  background: #42b983;
+  color: white;
+}
+.delete-btn {
+  background: #e74c3c;
+  color: white;
+}
+
+/* 编辑表单样式 */
+.edit-form {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eaeef5;
+}
+
+.edit-form .form-input,
+.edit-form .form-textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid #dce4ec;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  background-color: #fafbfc;
+}
+
+.edit-form .form-input:focus,
+.edit-form .form-textarea:focus {
+  outline: none;
+  border-color: #42b983;
+  background-color: white;
+  box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.1);
+}
+
+.edit-form .form-textarea {
+  resize: vertical;
+  min-height: 300px;
+  line-height: 1.5;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.save-btn {
+  background: #42b983;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.save-btn:hover {
+  background: #359268;
+}
+
+.cancel-btn {
+  background: #e2e6ea;
+  color: #4a5568;
+  border: none;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cancel-btn:hover {
+  background: #cbd5e0;
 }
 </style>

@@ -85,6 +85,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { parseFrontmatter, getPlainText } from '@/utils/markdown'
 
 // ===== 数据 =====
 const articles = ref([])
@@ -97,6 +98,7 @@ const newPost = ref({
   tags: '',
   content: ''
 })
+const isSubmitting = ref(false)
 
 // ===== 计算属性 =====
 // 所有标签
@@ -142,44 +144,6 @@ const highlightText = (text, keyword) => {
          text.slice(index + keyword.length)
 }
 
-// 解析 markdown 头部
-const parseFrontmatter = (markdown) => {
-  const match = markdown.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/)
-  if (!match) {
-    return { data: { title: '无标题', date: '', tags: [] }, content: markdown }
-  }
-  
-  const data = {}
-  match[1].split('\n').forEach(line => {
-    const idx = line.indexOf(':')
-    if (idx > 0) {
-      const key = line.slice(0, idx).trim()
-      let val = line.slice(idx + 1).trim()
-      if (key === 'tags') {
-        data.tags = val.replace(/[\[\]]/g, '').split(',').map(t => t.trim())
-      } else {
-        data[key] = val
-      }
-    }
-  })
-  if (!data.tags) data.tags = []
-  return { data, content: match[2] }
-}
-
-// 提取纯文本
-const getPlainText = (content, maxLen = 5000) => {
-  let text = content
-    .replace(/^#+\s+/gm, '')
-    .replace(/!\[.*?\]\(.*?\)/g, '')
-    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/`(.*?)`/g, '$1')
-    .replace(/(\*\*|__)(.*?)\1/g, '$2')
-    .replace(/(\*|_)(.*?)\1/g, '$2')
-    .replace(/\n/g, ' ')
-  return text.length > maxLen ? text.slice(0, maxLen) : text
-}
-
 // 提交文章到后端
 const submitPost = async () => {
   if (!newPost.value.title.trim()) {
@@ -190,7 +154,9 @@ const submitPost = async () => {
     alert('请填写文章内容')
     return
   }
-
+  if (isSubmitting.value) return
+  // 校验...
+  isSubmitting.value = true
   try {
     const response = await fetch('http://localhost:3000/api/save-post', {
       method: 'POST',
@@ -203,7 +169,7 @@ const submitPost = async () => {
     })
     const data = await response.json()
     if (data.success) {
-      alert('文章已保存！刷新页面即可看到新文章。')
+      alert('文章已保存！')
       // 重置表单并刷新文章列表
       newPost.value = { title: '', tags: '', content: '' }
       showWriteForm.value = false
@@ -215,6 +181,8 @@ const submitPost = async () => {
   } catch (err) {
     console.error(err)
     alert('请求后端失败，请确保后端服务已启动（npm run server）')
+  } finally {
+    isSubmitting.value = false
   }
 }
 

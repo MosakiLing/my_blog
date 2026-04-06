@@ -6,6 +6,7 @@
       <h1>Mosaki_Ling的巫师手札</h1>
       <nav>
         <router-link to="/">首页</router-link>
+        <router-link to="/statistics">数据统计</router-link>
         <router-link to="/about">关于我</router-link>
       </nav>
     </header>
