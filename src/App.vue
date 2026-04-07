@@ -73,11 +73,14 @@ footer {
 /* 7. 手机适配 手机端适配 */
 @media (max-width: 768px) {
   header {
-    flex-direction: column;  /* 垂直排列 */
-    text-align: center;  /* 居中 */
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    text-align: center;
   }
-  nav a {
-    margin: 0 10px;  /* 左右边距 */
+  nav {
+    display: flex;
+    gap: 1rem;
   }
 }
 </style>

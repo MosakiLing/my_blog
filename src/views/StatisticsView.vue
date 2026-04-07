@@ -145,4 +145,22 @@ onMounted(() => {
   width: 100%;
   height: 400px;
 }
+
+@media (max-width: 640px) {
+  .chart-box {
+    min-width: 100%;
+  }
+  
+  .chart {
+    height: 280px;
+  }
+  
+  .statistics h1 {
+    font-size: 1.5rem;
+  }
+  
+  .chart-box h2 {
+    font-size: 1.2rem;
+  }
+}
 </style>

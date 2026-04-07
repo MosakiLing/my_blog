@@ -479,4 +479,25 @@ onMounted(fetchArticles)
 .article-list {
   width: 700px;
 }
+
+/* 手机屏幕下减小内边距 */
+@media (max-width: 640px) {
+  .article-item {
+    padding: 0.875rem;
+  }
+  
+  .article-title {
+    font-size: 1.125rem;
+  }
+  
+  .article-meta {
+    font-size: 0.75rem;
+    gap: 0.5rem;
+  }
+  
+  .tag {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.4rem;
+  }
+}
 </style>

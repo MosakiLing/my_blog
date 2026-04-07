@@ -21,4 +21,18 @@
   line-height: 1.8;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
+
+@media (max-width: 640px) {
+  .about {
+    padding: 0.5rem;
+  }
+  
+  .about-content {
+    padding: 1rem;
+  }
+  
+  .about h1 {
+    font-size: 1.5rem;
+  }
+}
 </style>

@@ -384,4 +384,30 @@ onMounted(() => {
 .cancel-btn:hover {
   background: #cbd5e0;
 }
+
+/* 手机屏幕下减小内边距 */
+@media (max-width: 640px) {
+  .post {
+    padding: 1rem;
+  }
+  
+  .post h1 {
+    font-size: 1.5rem;
+  }
+  
+  .post-meta {
+    font-size: 0.75rem;
+    gap: 0.5rem;
+  }
+  
+  .post-content {
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+  
+  .post-content pre {
+    font-size: 0.8rem;
+    padding: 0.75rem;
+  }
+}
 </style>
