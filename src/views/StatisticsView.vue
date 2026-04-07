@@ -147,6 +147,11 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
+  .charts-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
   .chart-box {
     min-width: auto;
     width: 100%;
