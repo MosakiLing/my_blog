@@ -151,10 +151,6 @@ onMounted(() => {
     min-width: auto;
     width: 100%;
   }
-
-  .chart {
-    height: 280px;
-  }
   
   .statistics {
     padding: 0.5rem;
