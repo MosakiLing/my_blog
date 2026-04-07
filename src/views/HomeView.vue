@@ -482,6 +482,12 @@ onMounted(fetchArticles)
 
 /* 手机屏幕下减小内边距 */
 @media (max-width: 640px) {
+  .search-bar,
+  .tags-bar,
+  .article-list {
+    width: 100%;
+  }
+  
   .article-item {
     padding: 0.875rem;
   }

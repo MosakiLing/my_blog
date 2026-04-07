@@ -147,6 +147,10 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
+  .charts-container {
+    gap: 1rem;
+  }
+  
   .chart-box {
     min-width: 100%;
   }
