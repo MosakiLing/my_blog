@@ -148,7 +148,7 @@ onMounted(() => {
 
 @media (max-width: 640px) {
   .chart-box {
-    min-width: 100% !important;
+    min-width: auto !important;
     width: 100% !important;
   }
 }
