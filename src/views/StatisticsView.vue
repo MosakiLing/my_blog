@@ -147,9 +147,17 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
+  /* 强制统计页面占满全屏 */
   .statistics {
     padding: 0 !important;
     max-width: 100% !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw !important;
+    margin-right: -50vw !important;
   }
   
   .charts-container {
