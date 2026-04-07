@@ -153,7 +153,7 @@ onMounted(() => {
   }
   
   .chart {
-    width: 100%;
+    width: 100% !important;
     height: 280px;
   }
   
@@ -163,16 +163,6 @@ onMounted(() => {
   
   .charts-container {
     gap: 1rem;
-  }
-  
-  .statistics h1 {
-    font-size: 1.4rem;
-    text-align: center;
-  }
-  
-  .chart-box h2 {
-    font-size: 1.1rem;
-    text-align: center;
   }
 }
 </style>
