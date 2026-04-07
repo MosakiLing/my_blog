@@ -148,26 +148,28 @@ onMounted(() => {
 
 @media (max-width: 640px) {
   .statistics {
-    padding: 0;
+    padding: 0 !important;
+    max-width: 100% !important;
   }
   
   .charts-container {
     gap: 1rem;
     flex-direction: column;
+    width: 100% !important;
   }
 
   .chart-box {
-    min-width: auto;
-    width: 100%;
-    margin: 0;
-    padding: 0.75rem;
-    box-sizing: border-box;
-    border-radius: 0;
+    min-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0.5rem !important;
+    box-sizing: border-box !important;
+    border-radius: 0 !important;
   }
   
   .chart {
     height: 280px;
-    width: 100%;
+    width: 100% !important;
   }
   
   .statistics h1 {
