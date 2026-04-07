@@ -147,6 +147,11 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
+  .statistics {
+    padding: 0.5rem;
+    overflow-x: hidden;
+  }
+  
   .charts-container {
     gap: 1rem;
     flex-direction: column;
@@ -155,6 +160,7 @@ onMounted(() => {
   .chart-box {
     min-width: auto;
     width: 100%;
+    box-sizing: border-box;
   }
   
   .chart {
