@@ -147,43 +147,27 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
-  /* 强制统计页面占满全屏 */
+  .chart-box {
+    min-width: 100%;
+    width: 100%;
+  }
+  
+  .chart {
+    width: 100%;
+    height: 280px;
+  }
+  
   .statistics {
-    padding: 0 !important;
-    max-width: 100% !important;
-    width: 100vw !important;
-    margin: 0 !important;
-    position: relative;
-    left: 50%;
-    right: 50%;
-    margin-left: -50vw !important;
-    margin-right: -50vw !important;
+    padding: 0.5rem;
   }
   
   .charts-container {
     gap: 1rem;
-    flex-direction: column;
-    width: 100% !important;
-  }
-
-  .chart-box {
-    min-width: 100% !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0.5rem !important;
-    box-sizing: border-box !important;
-    border-radius: 0 !important;
-  }
-  
-  .chart {
-    height: 280px;
-    width: 100% !important;
   }
   
   .statistics h1 {
     font-size: 1.4rem;
     text-align: center;
-    padding: 0 0.5rem;
   }
   
   .chart-box h2 {
