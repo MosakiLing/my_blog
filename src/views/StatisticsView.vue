@@ -149,10 +149,12 @@ onMounted(() => {
 @media (max-width: 640px) {
   .charts-container {
     gap: 1rem;
+    flex-direction: column;
   }
 
   .chart-box {
-    min-width: 100% !important;
+    min-width: auto;
+    width: 100%;
   }
   
   .chart {
@@ -161,10 +163,12 @@ onMounted(() => {
   
   .statistics h1 {
     font-size: 1.5rem;
+    text-align: center;
   }
   
   .chart-box h2 {
     font-size: 1.2rem;
+    text-align: center;
   }
 }
 </style>
